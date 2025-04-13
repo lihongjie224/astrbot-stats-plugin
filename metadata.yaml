@@ -1,0 +1,5 @@
+name: astrbot_plugin_chat_stats # 插件的唯一识别名
+desc: 基于SQLite存储的群聊统计分析工具，支持群聊排名、热力图和词云生成 # 插件简短描述
+version: v1.0.0 # 插件版本号
+author: User # 作者
+repo: https://github.com/lihongjie224/astrbot-stats-plugin # 插件的仓库地址
