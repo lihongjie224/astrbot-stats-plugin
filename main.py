@@ -165,9 +165,12 @@ class ChatStatsPlugin(Star):
         
         # 构建图片消息
         today = datetime.now().strftime('%Y-%m-%d')
-        image_component = Image(img_buf.getvalue())
+        from astrbot.api.message_components import Plain, Image as ComponentImage
         
-        return AstrMessageEvent.result_builder().add_component(image_component).add_plain(f"{today} 群聊排名统计").build()
+        # 使用MessageChain构建消息
+        return AstrMessageEvent.result_builder().add_component(
+            ComponentImage(base64=img_buf.getvalue())
+        ).add_plain(f"{today} 群聊排名统计").build()
     
     async def generate_heatmap(self, group_id):
         """生成群聊热力图"""
@@ -217,9 +220,12 @@ class ChatStatsPlugin(Star):
         
         # 构建图片消息
         today = datetime.now().strftime('%Y-%m-%d')
-        image_component = Image(img_buf.getvalue())
+        from astrbot.api.message_components import Plain, Image as ComponentImage
         
-        return AstrMessageEvent.result_builder().add_component(image_component).add_plain(f"{today} 群聊热力图").build()
+        # 使用MessageChain构建消息
+        return AstrMessageEvent.result_builder().add_component(
+            ComponentImage(base64=img_buf.getvalue())
+        ).add_plain(f"{today} 群聊热力图").build()
     
     async def generate_wordcloud(self, group_id):
         """生成群聊词云"""
@@ -262,9 +268,12 @@ class ChatStatsPlugin(Star):
         
         # 构建图片消息
         today = datetime.now().strftime('%Y-%m-%d')
-        image_component = Image(img_buf.getvalue())
+        from astrbot.api.message_components import Plain, Image as ComponentImage
         
-        return AstrMessageEvent.result_builder().add_component(image_component).add_plain(f"{today} 群聊词云").build()
+        # 使用MessageChain构建消息
+        return AstrMessageEvent.result_builder().add_component(
+            ComponentImage(base64=img_buf.getvalue())
+        ).add_plain(f"{today} 群聊词云").build()
     
     @filter.command("chatstats_config")
     async def config(self, event: AstrMessageEvent):
