@@ -214,7 +214,7 @@ class ChatStatsPlugin(Star):
         """
         
         # 使用 html_render 方法渲染成图片
-        image_url = self.html_render(tmpl, data)
+        image_url = self.html_render(tmpl, data, return_url=True)
         
         # 构建图片消息
         from astrbot.api.message_components import Plain, Image
@@ -365,7 +365,7 @@ class ChatStatsPlugin(Star):
         """
         
         # 使用 html_render 方法渲染成图片
-        image_url = self.html_render(tmpl, data)
+        image_url = self.html_render(tmpl, data, return_url=True)
         
         # 构建图片消息
         from astrbot.api.message_components import Plain, Image
@@ -450,7 +450,7 @@ class ChatStatsPlugin(Star):
         """
         
         # 使用 html_render 方法渲染成图片
-        image_url = self.html_render(tmpl, data)
+        image_url = self.html_render(tmpl, data, return_url=True)
         
         # 构建图片消息
         from astrbot.api.message_components import Plain, Image
