@@ -137,6 +137,7 @@ class ChatStatsPlugin(Star):
             "counts": sender_counts.values.tolist(),
             "date": datetime.now().strftime('%Y-%m-%d')
         }
+        logger.info(f"排名模板数据 data: {data}")
         
         # HTML 模板 (使用 Chart.js)
         tmpl = """
