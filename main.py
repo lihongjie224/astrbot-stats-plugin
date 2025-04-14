@@ -23,11 +23,6 @@ class ChatStatsPlugin(Star):
         # 获取 SQLite 数据库路径
         self.db_path = None
         self.config_file = "chat_stats_config.json"
-        self.triggers = {
-            "群聊排名": self.generate_chat_ranking,
-            "群聊热力图": self.generate_heatmap,
-            "群聊词云": self.generate_wordcloud
-        }
         
     async def initialize(self):
         """初始化插件，找到SQLite数据库"""
@@ -119,32 +114,19 @@ class ChatStatsPlugin(Star):
                 conn.close()
             return None
     
-    @filter.event_message_type(filter.EventMessageType.ALL)
-    async def on_message(self, event: AstrMessageEvent):
-        """监听消息，检测触发关键词"""
-        if event.get_platform_name() != "gewechat":
-            return
-            
+    @filter.command("群聊排名")
+    async def generate_chat_ranking(self, event: AstrMessageEvent):
+        """生成群聊排名条形图"""
         # 检查是否是群聊
         if not event.message_obj.group_id:
+            yield event.plain_result("该功能仅适用于群聊")
             return
             
-        # 检查消息内容是否包含触发词
-        message = event.message_str.strip()
-        
-        for trigger, handler in self.triggers.items():
-            if trigger in message:
-                group_id = event.message_obj.group_id
-                result = await handler(group_id)
-                if result:
-                    yield result
-                break
-    
-    async def generate_chat_ranking(self, group_id):
-        """生成群聊排名条形图"""
+        group_id = event.message_obj.group_id
         df = self.get_today_data(group_id)
         if df is None or df.empty:
-            return AstrMessageEvent.plain_result("今天还没有聊天记录，无法生成排名")
+            yield event.plain_result("今天还没有聊天记录，无法生成排名")
+            return
         
         # 统计每个发送者的消息数量
         sender_counts = df.groupby('sender_name').size().sort_values(ascending=False)
@@ -219,15 +201,23 @@ class ChatStatsPlugin(Star):
         
         # 构建图片消息
         from astrbot.api.message_components import Plain, Image
-        return AstrMessageEvent.result_builder().add_component(
+        yield AstrMessageEvent.result_builder().add_component(
             Image.fromURL(image_url)
         ).add_plain(f"{data['date']} 群聊排名统计").build()
     
-    async def generate_heatmap(self, group_id):
+    @filter.command("群聊热力图")
+    async def generate_heatmap(self, event: AstrMessageEvent):
         """生成群聊热力图"""
+        # 检查是否是群聊
+        if not event.message_obj.group_id:
+            yield event.plain_result("该功能仅适用于群聊")
+            return
+            
+        group_id = event.message_obj.group_id
         df = self.get_today_data(group_id)
         if df is None or df.empty:
-            return AstrMessageEvent.plain_result("今天还没有聊天记录，无法生成热力图")
+            yield event.plain_result("今天还没有聊天记录，无法生成热力图")
+            return
         
         # 排序发送者按消息总数
         sender_totals = df.groupby('sender_name').size().sort_values(ascending=False)
@@ -371,15 +361,23 @@ class ChatStatsPlugin(Star):
         
         # 构建图片消息
         from astrbot.api.message_components import Plain, Image
-        return AstrMessageEvent.result_builder().add_component(
+        yield AstrMessageEvent.result_builder().add_component(
             Image.fromURL(image_url)
         ).add_plain(f"{data['date']} 群聊热力图").build()
     
-    async def generate_wordcloud(self, group_id):
+    @filter.command("群聊词云")
+    async def generate_wordcloud(self, event: AstrMessageEvent):
         """生成群聊词云"""
+        # 检查是否是群聊
+        if not event.message_obj.group_id:
+            yield event.plain_result("该功能仅适用于群聊")
+            return
+            
+        group_id = event.message_obj.group_id
         df = self.get_today_data(group_id)
         if df is None or df.empty:
-            return AstrMessageEvent.plain_result("今天还没有聊天记录，无法生成词云")
+            yield event.plain_result("今天还没有聊天记录，无法生成词云")
+            return
         
         # 合并所有消息文本
         all_text = ' '.join(df['message'].tolist())
@@ -457,7 +455,7 @@ class ChatStatsPlugin(Star):
         
         # 构建图片消息
         from astrbot.api.message_components import Plain, Image
-        return AstrMessageEvent.result_builder().add_component(
+        yield AstrMessageEvent.result_builder().add_component(
             Image.fromURL(image_url)
         ).add_plain(f"{data['date']} 群聊词云").build()
     
