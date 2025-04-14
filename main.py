@@ -144,33 +144,83 @@ class ChatStatsPlugin(Star):
         """生成群聊排名条形图"""
         df = self.get_today_data(group_id)
         if df is None or df.empty:
-            return AstrMessageEvent.plain_result("今天还没有聊天记录，无法生成群聊排名")
+            return AstrMessageEvent.plain_result("今天还没有聊天记录，无法生成排名")
         
-        # 按发送人统计消息数量
+        # 统计每个发送者的消息数量
         sender_counts = df.groupby('sender_name').size().sort_values(ascending=False)
         
-        # 生成条形图
-        plt.figure(figsize=(10, 6))
-        sender_counts.plot(kind='bar', color='skyblue')
-        plt.title('今日群聊排名')
-        plt.xlabel('发送人')
-        plt.ylabel('消息数量')
-        plt.tight_layout()
+        # 准备模板数据
+        data = {
+            "senders": sender_counts.index.tolist(),
+            "counts": sender_counts.values.tolist(),
+            "date": datetime.now().strftime('%Y-%m-%d')
+        }
         
-        # 保存到内存
-        img_buf = io.BytesIO()
-        plt.savefig(img_buf, format='png')
-        img_buf.seek(0)
-        plt.close()
+        # HTML 模板 (使用 Chart.js)
+        tmpl = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <style>
+                body { font-family: Arial, sans-serif; background-color: white; margin: 0; padding: 20px; }
+                .container { width: 800px; height: 500px; }
+                #title { text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 10px; }
+            </style>
+        </head>
+        <body>
+            <div id="title">{{ date }} 群聊排名统计</div>
+            <div class="container">
+                <canvas id="chatRanking"></canvas>
+            </div>
+            <script>
+                const ctx = document.getElementById('chatRanking');
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: {{ senders|tojson }},
+                        datasets: [{
+                            label: '消息数量',
+                            data: {{ counts|tojson }},
+                            backgroundColor: 'rgba(54, 162, 235, 0.8)'
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: '消息数量'
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: '发送者'
+                                }
+                            }
+                        }
+                    }
+                });
+            </script>
+        </body>
+        </html>
+        """
+        
+        # 使用 html_render 方法渲染成图片
+        image_url = self.html_render(tmpl, data)
         
         # 构建图片消息
-        today = datetime.now().strftime('%Y-%m-%d')
-        from astrbot.api.message_components import Plain, Image as ComponentImage
-        
-        # 使用MessageChain构建消息
+        from astrbot.api.message_components import Plain, Image
         return AstrMessageEvent.result_builder().add_component(
-            ComponentImage(base64=img_buf.getvalue())
-        ).add_plain(f"{today} 群聊排名统计").build()
+            Image.fromURL(image_url)
+        ).add_plain(f"{data['date']} 群聊排名统计").build()
     
     async def generate_heatmap(self, group_id):
         """生成群聊热力图"""
@@ -187,45 +237,141 @@ class ChatStatsPlugin(Star):
             top_senders = top_senders[:10]
         
         # 生成热力图数据
+        hours = list(range(24))
         heatmap_data = []
+        
         for sender in top_senders:
             sender_df = df[df['sender_name'] == sender]
             hourly_counts = sender_df.groupby('hour').size()
             
             # 确保所有小时都有数据
-            hour_data = [hourly_counts.get(hour, 0) for hour in range(24)]
-            heatmap_data.append(hour_data)
+            hour_data = []
+            for hour in hours:
+                hour_data.append({
+                    'x': hour,
+                    'y': sender,
+                    'v': int(hourly_counts.get(hour, 0))
+                })
+            
+            heatmap_data.extend(hour_data)
         
-        # 创建热力图
-        plt.figure(figsize=(12, 8))
-        im = plt.imshow(heatmap_data, cmap='YlOrRd')
+        # 准备模板数据
+        data = {
+            "heatmap_data": heatmap_data,
+            "senders": top_senders,
+            "hours": [f"{h}时" for h in hours],
+            "date": datetime.now().strftime('%Y-%m-%d')
+        }
         
-        # 设置标签
-        plt.yticks(np.arange(len(top_senders)), top_senders)
-        plt.xticks(np.arange(0, 24, 1), [f"{h}时" for h in range(24)])
-        plt.xlabel('时间')
-        plt.ylabel('发送人')
-        plt.title('今日群聊热力图')
+        # HTML 模板 (使用 Chart.js)
+        tmpl = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-heatmap"></script>
+            <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+            <style>
+                body { font-family: Arial, sans-serif; background-color: white; margin: 0; padding: 20px; }
+                .container { width: 900px; height: 500px; }
+                #title { text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 10px; }
+            </style>
+        </head>
+        <body>
+            <div id="title">{{ date }} 群聊热力图</div>
+            <div class="container">
+                <canvas id="heatmap"></canvas>
+            </div>
+            <script>
+                // 兼容 Chart.js 的热力图
+                const data = {{ heatmap_data|tojson }};
+                const ctx = document.getElementById('heatmap').getContext('2d');
+                
+                // 找出最大值以便设置颜色范围
+                const values = data.map(item => item.v);
+                const maxValue = Math.max(...values, 10);
+                
+                new Chart(ctx, {
+                    type: 'matrix',
+                    data: {
+                        datasets: [{
+                            label: '消息量',
+                            data: data,
+                            backgroundColor(context) {
+                                const value = context.dataset.data[context.dataIndex].v;
+                                const alpha = Math.min(value / maxValue, 1);
+                                return `rgba(255, 99, 132, ${alpha})`;
+                            },
+                            borderWidth: 1,
+                            borderColor: 'white',
+                            width: ({ chart }) => (chart.chartArea || {}).width / {{ hours|length }} - 1,
+                            height: ({ chart }) => (chart.chartArea || {}).height / {{ senders|length }} - 1
+                        }]
+                    },
+                    options: {
+                        plugins: {
+                            tooltip: {
+                                callbacks: {
+                                    title() {
+                                        return '';
+                                    },
+                                    label(context) {
+                                        const v = context.dataset.data[context.dataIndex];
+                                        return [`${v.y}`, `${v.x}时: ${v.v}条消息`];
+                                    }
+                                }
+                            },
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                type: 'category',
+                                labels: {{ senders|tojson }},
+                                offset: true,
+                                ticks: {
+                                    display: true
+                                },
+                                grid: {
+                                    display: false
+                                },
+                                title: {
+                                    display: true,
+                                    text: '发送者'
+                                }
+                            },
+                            x: {
+                                type: 'category',
+                                labels: {{ hours|tojson }},
+                                offset: true,
+                                ticks: {
+                                    display: true
+                                },
+                                grid: {
+                                    display: false
+                                },
+                                title: {
+                                    display: true,
+                                    text: '时间'
+                                }
+                            }
+                        }
+                    }
+                });
+            </script>
+        </body>
+        </html>
+        """
         
-        # 添加颜色条
-        plt.colorbar(im, label='消息数量')
-        
-        plt.tight_layout()
-        
-        # 保存到内存
-        img_buf = io.BytesIO()
-        plt.savefig(img_buf, format='png')
-        img_buf.seek(0)
-        plt.close()
+        # 使用 html_render 方法渲染成图片
+        image_url = self.html_render(tmpl, data)
         
         # 构建图片消息
-        today = datetime.now().strftime('%Y-%m-%d')
-        from astrbot.api.message_components import Plain, Image as ComponentImage
-        
-        # 使用MessageChain构建消息
+        from astrbot.api.message_components import Plain, Image
         return AstrMessageEvent.result_builder().add_component(
-            ComponentImage(base64=img_buf.getvalue())
-        ).add_plain(f"{today} 群聊热力图").build()
+            Image.fromURL(image_url)
+        ).add_plain(f"{data['date']} 群聊热力图").build()
     
     async def generate_wordcloud(self, group_id):
         """生成群聊词云"""
@@ -241,39 +387,76 @@ class ChatStatsPlugin(Star):
         all_text = re.sub(r'[^\w\s]', '', all_text)  # 移除标点符号
         
         # 使用jieba进行中文分词
-        words = ' '.join(jieba.cut(all_text))
+        words_list = jieba.cut(all_text)
+        words = ' '.join(words_list)
         
-        # 生成词云
-        wordcloud = WordCloud(
-            font_path='/System/Library/Fonts/PingFang.ttc',  # macOS中文字体
-            width=800,
-            height=400,
-            background_color='white',
-            max_words=100,
-            contour_width=1,
-            contour_color='steelblue'
-        ).generate(words)
+        # 统计词频
+        word_freq = {}
+        for word in words_list:
+            if len(word.strip()) > 1:  # 忽略单个字符
+                word_freq[word] = word_freq.get(word, 0) + 1
         
-        # 创建图像
-        plt.figure(figsize=(10, 6))
-        plt.imshow(wordcloud, interpolation='bilinear')
-        plt.axis('off')
-        plt.tight_layout()
+        # 转换为词云所需的格式
+        word_list = []
+        for word, freq in word_freq.items():
+            if freq > 1:  # 忽略只出现一次的词
+                word_list.append({"text": word, "value": freq})
         
-        # 保存到内存
-        img_buf = io.BytesIO()
-        plt.savefig(img_buf, format='png')
-        img_buf.seek(0)
-        plt.close()
+        # 排序并限制词数
+        word_list = sorted(word_list, key=lambda x: x["value"], reverse=True)
+        if len(word_list) > 100:
+            word_list = word_list[:100]
+        
+        # 准备模板数据
+        data = {
+            "words": word_list,
+            "date": datetime.now().strftime('%Y-%m-%d')
+        }
+        
+        # HTML 模板 (使用 wordcloud2.js)
+        tmpl = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.2.2/wordcloud2.min.js"></script>
+            <style>
+                body { font-family: Arial, sans-serif; background-color: white; margin: 0; padding: 20px; }
+                .container { width: 800px; height: 500px; border: 1px solid #eee; }
+                #title { text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 10px; }
+            </style>
+        </head>
+        <body>
+            <div id="title">{{ date }} 群聊词云</div>
+            <div class="container">
+                <canvas id="wordcloud" width="800" height="500"></canvas>
+            </div>
+            <script>
+                // 词云数据
+                const words = {{ words|tojson }};
+                
+                // 配置和渲染词云
+                WordCloud(document.getElementById('wordcloud'), { 
+                    list: words.map(item => [item.text, item.value]),
+                    gridSize: 16,
+                    weightFactor: 6,
+                    fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',
+                    color: 'random-dark',
+                    backgroundColor: 'white',
+                    rotateRatio: 0.5
+                });
+            </script>
+        </body>
+        </html>
+        """
+        
+        # 使用 html_render 方法渲染成图片
+        image_url = self.html_render(tmpl, data)
         
         # 构建图片消息
-        today = datetime.now().strftime('%Y-%m-%d')
-        from astrbot.api.message_components import Plain, Image as ComponentImage
-        
-        # 使用MessageChain构建消息
+        from astrbot.api.message_components import Plain, Image
         return AstrMessageEvent.result_builder().add_component(
-            ComponentImage(base64=img_buf.getvalue())
-        ).add_plain(f"{today} 群聊词云").build()
+            Image.fromURL(image_url)
+        ).add_plain(f"{data['date']} 群聊词云").build()
     
     @filter.command("chatstats_config")
     async def config(self, event: AstrMessageEvent):
