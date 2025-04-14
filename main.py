@@ -200,10 +200,7 @@ class ChatStatsPlugin(Star):
         logger.info(f"排名图表 image_url: {image_url}")
         
         # 构建图片消息
-        from astrbot.api.message_components import Plain, Image
-        yield AstrMessageEvent.result_builder().add_component(
-            Image.fromURL(image_url)
-        ).add_plain(f"{data['date']} 群聊排名统计").build()
+        yield event.image_result(image_url)
     
     @filter.command("群聊热力图")
     async def generate_heatmap(self, event: AstrMessageEvent):
@@ -360,10 +357,7 @@ class ChatStatsPlugin(Star):
         logger.info(f"热力图表 image_url: {image_url}")
         
         # 构建图片消息
-        from astrbot.api.message_components import Plain, Image
-        yield AstrMessageEvent.result_builder().add_component(
-            Image.fromURL(image_url)
-        ).add_plain(f"{data['date']} 群聊热力图").build()
+        yield event.image_result(image_url)
     
     @filter.command("群聊词云")
     async def generate_wordcloud(self, event: AstrMessageEvent):
@@ -454,10 +448,7 @@ class ChatStatsPlugin(Star):
         logger.info(f"词云图表 image_url: {image_url}")
         
         # 构建图片消息
-        from astrbot.api.message_components import Plain, Image
-        yield AstrMessageEvent.result_builder().add_component(
-            Image.fromURL(image_url)
-        ).add_plain(f"{data['date']} 群聊词云").build()
+        yield event.image_result(image_url)
     
     @filter.command("chatstats_config")
     async def config(self, event: AstrMessageEvent):
