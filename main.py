@@ -197,7 +197,7 @@ class ChatStatsPlugin(Star):
         """
         
         # 使用 html_render 方法渲染成图片
-        image_url = self.html_render(tmpl, data, return_url=True)
+        image_url = await self.html_render(tmpl, data, return_url=True)
         logger.info(f"排名图表 image_url: {image_url}")
         
         # 构建图片消息
