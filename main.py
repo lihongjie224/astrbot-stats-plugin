@@ -139,58 +139,87 @@ class ChatStatsPlugin(Star):
         }
         logger.info(f"排名模板数据 data: {data}")
         
-        # HTML 模板 (使用 Chart.js)
+        # HTML 模板 (使用 ECharts)
         tmpl = """
         <!DOCTYPE html>
         <html>
         <head>
-            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
             <style>
-                body { font-family: Arial, sans-serif; background-color: white; margin: 0; padding: 20px; }
-                .container { width: 800px; height: 500px; }
-                #title { text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 10px; }
+                body { font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; background-color: white; margin: 0; padding: 20px; }
+                .container { width: 900px; height: 500px; }
+                #title { text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 20px; color: #333; }
             </style>
         </head>
         <body>
             <div id="title">{{ date }} 群聊排名统计</div>
-            <div class="container">
-                <canvas id="chatRanking"></canvas>
-            </div>
+            <div id="main" class="container"></div>
             <script>
-                const ctx = document.getElementById('chatRanking');
-                new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: {{ senders|tojson }},
-                        datasets: [{
-                            label: '消息数量',
-                            data: {{ counts|tojson }},
-                            backgroundColor: 'rgba(54, 162, 235, 0.8)'
-                        }]
-                    },
-                    options: {
-                        indexAxis: 'y',
-                        plugins: {
-                            legend: {
-                                display: false
-                            }
+                // 初始化图表
+                var myChart = echarts.init(document.getElementById('main'));
+                
+                // 准备数据
+                var senders = {{ senders|tojson }};
+                var counts = {{ counts|tojson }};
+                
+                // 图表配置
+                var option = {
+                    tooltip: {
+                        trigger: 'axis',
+                        axisPointer: {
+                            type: 'shadow'
                         },
-                        scales: {
-                            x: {
-                                title: {
-                                    display: true,
-                                    text: '消息数量'
-                                }
+                        formatter: '{b}: {c} 条消息'
+                    },
+                    grid: {
+                        left: '3%',
+                        right: '4%',
+                        bottom: '3%',
+                        containLabel: true
+                    },
+                    xAxis: {
+                        type: 'value',
+                        name: '消息数量',
+                        nameLocation: 'middle',
+                        nameGap: 30,
+                        axisLabel: {
+                            formatter: '{value}'
+                        }
+                    },
+                    yAxis: {
+                        type: 'category',
+                        name: '发送者',
+                        nameLocation: 'end',
+                        nameGap: 20,
+                        data: senders,
+                        axisTick: {
+                            alignWithLabel: true
+                        }
+                    },
+                    series: [
+                        {
+                            name: '消息数量',
+                            type: 'bar',
+                            data: counts,
+                            itemStyle: {
+                                // 渐变色
+                                color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                                    {offset: 0, color: '#4680FF'},
+                                    {offset: 1, color: '#36CBCB'}
+                                ])
                             },
-                            y: {
-                                title: {
-                                    display: true,
-                                    text: '发送者'
-                                }
+                            barWidth: '60%',
+                            label: {
+                                show: true,
+                                position: 'right',
+                                formatter: '{c}'
                             }
                         }
-                    }
-                });
+                    ]
+                };
+                
+                // 渲染图表
+                myChart.setOption(option);
             </script>
         </body>
         </html>
@@ -253,102 +282,102 @@ class ChatStatsPlugin(Star):
             "date": datetime.now().strftime('%Y-%m-%d')
         }
         
-        # HTML 模板 (使用 Chart.js)
+        # HTML 模板 (使用 ECharts)
         tmpl = """
         <!DOCTYPE html>
         <html>
         <head>
-            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-            <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-heatmap"></script>
-            <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+            <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
             <style>
-                body { font-family: Arial, sans-serif; background-color: white; margin: 0; padding: 20px; }
-                .container { width: 900px; height: 500px; }
-                #title { text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 10px; }
+                body { font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; background-color: white; margin: 0; padding: 20px; }
+                .container { width: 900px; height: 600px; }
+                #title { text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 20px; color: #333; }
             </style>
         </head>
         <body>
             <div id="title">{{ date }} 群聊热力图</div>
-            <div class="container">
-                <canvas id="heatmap"></canvas>
-            </div>
+            <div id="main" class="container"></div>
             <script>
-                // 兼容 Chart.js 的热力图
-                const data = {{ heatmap_data|tojson }};
-                const ctx = document.getElementById('heatmap').getContext('2d');
+                // 初始化图表
+                var myChart = echarts.init(document.getElementById('main'));
                 
-                // 找出最大值以便设置颜色范围
-                const values = data.map(item => item.v);
-                const maxValue = Math.max(...values, 10);
+                // 准备数据
+                var senders = {{ senders|tojson }};
+                var hours = {{ hours|tojson }};
+                var data = {{ heatmap_data|tojson }};
                 
-                new Chart(ctx, {
-                    type: 'matrix',
-                    data: {
-                        datasets: [{
-                            label: '消息量',
-                            data: data,
-                            backgroundColor(context) {
-                                const value = context.dataset.data[context.dataIndex].v;
-                                const alpha = Math.min(value / maxValue, 1);
-                                return `rgba(255, 99, 132, ${alpha})`;
-                            },
-                            borderWidth: 1,
-                            borderColor: 'white',
-                            width: ({ chart }) => (chart.chartArea || {}).width / {{ hours|length }} - 1,
-                            height: ({ chart }) => (chart.chartArea || {}).height / {{ senders|length }} - 1
-                        }]
+                // 处理数据为 ECharts 可用格式
+                var heatmapData = [];
+                data.forEach(function(item) {
+                    heatmapData.push([item.x, senders.indexOf(item.y), item.v]);
+                });
+                
+                // 图表配置
+                var option = {
+                    tooltip: {
+                        position: 'top',
+                        formatter: function (params) {
+                            return senders[params.value[1]] + '<br>' + hours[params.value[0]] + ': ' + params.value[2] + ' 条消息';
+                        }
                     },
-                    options: {
-                        plugins: {
-                            tooltip: {
-                                callbacks: {
-                                    title() {
-                                        return '';
-                                    },
-                                    label(context) {
-                                        const v = context.dataset.data[context.dataIndex];
-                                        return [`${v.y}`, `${v.x}时: ${v.v}条消息`];
-                                    }
-                                }
-                            },
-                            legend: {
-                                display: false
+                    grid: {
+                        left: '10%',
+                        right: '5%',
+                        top: '10%',
+                        bottom: '10%'
+                    },
+                    xAxis: {
+                        type: 'category',
+                        data: hours,
+                        splitArea: {
+                            show: true
+                        },
+                        name: '时间',
+                        nameLocation: 'middle',
+                        nameGap: 30
+                    },
+                    yAxis: {
+                        type: 'category',
+                        data: senders,
+                        splitArea: {
+                            show: true
+                        },
+                        name: '发送者',
+                        nameLocation: 'middle',
+                        nameGap: 70
+                    },
+                    visualMap: {
+                        min: 0,
+                        max: Math.max(...heatmapData.map(item => item[2]), 10),
+                        calculable: true,
+                        orient: 'horizontal',
+                        left: 'center',
+                        bottom: '5%',
+                        inRange: {
+                            color: ['#ebedf0', '#c6e48b', '#7bc96f', '#239a3b', '#196127']
+                        }
+                    },
+                    series: [{
+                        name: '消息数量',
+                        type: 'heatmap',
+                        data: heatmapData,
+                        label: {
+                            show: true,
+                            formatter: function(params) {
+                                return params.value[2] > 0 ? params.value[2] : '';
                             }
                         },
-                        scales: {
-                            y: {
-                                type: 'category',
-                                labels: {{ senders|tojson }},
-                                offset: true,
-                                ticks: {
-                                    display: true
-                                },
-                                grid: {
-                                    display: false
-                                },
-                                title: {
-                                    display: true,
-                                    text: '发送者'
-                                }
-                            },
-                            x: {
-                                type: 'category',
-                                labels: {{ hours|tojson }},
-                                offset: true,
-                                ticks: {
-                                    display: true
-                                },
-                                grid: {
-                                    display: false
-                                },
-                                title: {
-                                    display: true,
-                                    text: '时间'
-                                }
+                        emphasis: {
+                            itemStyle: {
+                                shadowBlur: 10,
+                                shadowColor: 'rgba(0, 0, 0, 0.5)'
                             }
                         }
-                    }
-                });
+                    }]
+                };
+                
+                // 渲染图表
+                myChart.setOption(option);
             </script>
         </body>
         </html>
@@ -410,37 +439,81 @@ class ChatStatsPlugin(Star):
             "date": datetime.now().strftime('%Y-%m-%d')
         }
         
-        # HTML 模板 (使用 wordcloud2.js)
+        # HTML 模板 (使用 ECharts 词云)
         tmpl = """
         <!DOCTYPE html>
         <html>
         <head>
-            <script src="https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.2.2/wordcloud2.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/echarts-wordcloud@2.1.0/dist/echarts-wordcloud.min.js"></script>
             <style>
-                body { font-family: Arial, sans-serif; background-color: white; margin: 0; padding: 20px; }
-                .container { width: 800px; height: 500px; border: 1px solid #eee; }
-                #title { text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 10px; }
+                body { font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; background-color: white; margin: 0; padding: 20px; }
+                .container { width: 900px; height: 600px; }
+                #title { text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 20px; color: #333; }
             </style>
         </head>
         <body>
             <div id="title">{{ date }} 群聊词云</div>
-            <div class="container">
-                <canvas id="wordcloud" width="800" height="500"></canvas>
-            </div>
+            <div id="main" class="container"></div>
             <script>
-                // 词云数据
-                const words = {{ words|tojson }};
+                // 初始化图表
+                var myChart = echarts.init(document.getElementById('main'));
                 
-                // 配置和渲染词云
-                WordCloud(document.getElementById('wordcloud'), { 
-                    list: words.map(item => [item.text, item.value]),
-                    gridSize: 16,
-                    weightFactor: 6,
-                    fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',
-                    color: 'random-dark',
-                    backgroundColor: 'white',
-                    rotateRatio: 0.5
-                });
+                // 准备数据
+                var words = {{ words|tojson }};
+                
+                // 图表配置
+                var option = {
+                    tooltip: {
+                        show: true,
+                        formatter: function(params) {
+                            return params.data.name + ': ' + params.data.value;
+                        }
+                    },
+                    series: [{
+                        type: 'wordCloud',
+                        shape: 'circle',
+                        left: 'center',
+                        top: 'center',
+                        width: '90%',
+                        height: '90%',
+                        right: null,
+                        bottom: null,
+                        sizeRange: [12, 60],
+                        rotationRange: [-45, 45],
+                        rotationStep: 15,
+                        gridSize: 8,
+                        drawOutOfBound: false,
+                        layoutAnimation: true,
+                        textStyle: {
+                            fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',
+                            fontWeight: 'normal',
+                            color: function () {
+                                // 随机颜色
+                                return 'rgb(' + [
+                                    Math.round(Math.random() * 200 + 55),
+                                    Math.round(Math.random() * 200 + 55),
+                                    Math.round(Math.random() * 200 + 55)
+                                ].join(',') + ')';
+                            }
+                        },
+                        emphasis: {
+                            textStyle: {
+                                shadowBlur: 10,
+                                shadowColor: '#333'
+                            }
+                        },
+                        data: words.map(function(item) {
+                            return {
+                                name: item.text,
+                                value: item.value
+                            };
+                        })
+                    }]
+                };
+                
+                // 渲染图表
+                myChart.setOption(option);
             </script>
         </body>
         </html>
